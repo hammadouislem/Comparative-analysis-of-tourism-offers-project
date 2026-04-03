@@ -1,0 +1,64 @@
+import os
+from typing import List
+
+import numpy as np
+import pandas as pd
+
+from processing.clean_data import clean_dataframe
+from utils.helpers import ensure_directory
+
+
+def _normalize_for_concat(df: pd.DataFrame) -> pd.DataFrame:
+    """Align dtypes before concat to avoid pandas FutureWarnings on all-NA/object columns."""
+    out = df.copy()
+    out["price"] = pd.to_numeric(out["price"], errors="coerce")
+    out["duration"] = pd.to_numeric(out["duration"], errors="coerce")
+    out["rating"] = pd.Series(np.nan, index=out.index, dtype="float64")
+    return out
+
+
+def merge_and_clean(raw_csv_paths: List[str], output_path: str) -> pd.DataFrame:
+    """
+    Concatenate multiple raw CSV exports (same logical columns) then clean.
+
+    Each CSV should have at least: name, location, price.
+    Optional: type, duration, url (ignored by cleaning except type/duration).
+    """
+    base_cols = ["name", "type", "location", "price", "duration"]
+    unified_cols = base_cols + ["rating"]
+    chunks = []
+
+    for path in raw_csv_paths:
+        if not os.path.isfile(path):
+            print(f"[Merge] Skip missing file: {path}")
+            continue
+        try:
+            df = pd.read_csv(path)
+        except (pd.errors.EmptyDataError, FileNotFoundError) as exc:
+            print(f"[Merge] Skip unreadable {path}: {exc}")
+            continue
+        if df.empty:
+            print(f"[Merge] Skip empty: {path}")
+            continue
+        if "type" not in df.columns:
+            df["type"] = "offer"
+        if "duration" not in df.columns:
+            df["duration"] = np.nan
+        missing = [c for c in base_cols if c not in df.columns]
+        if missing:
+            print(f"[Merge] Skip {path} (missing columns {missing})")
+            continue
+        chunks.append(_normalize_for_concat(df[base_cols]))
+        print(f"[Merge] Loaded {len(df)} rows from {os.path.basename(path)}")
+
+    if not chunks:
+        merged = pd.DataFrame(columns=unified_cols)
+    else:
+        merged = pd.concat(chunks, ignore_index=True)
+
+    merged_clean = clean_dataframe(merged)
+
+    ensure_directory(os.path.dirname(output_path))
+    merged_clean.to_csv(output_path, index=False)
+    print(f"[Merge] Saved clean merged data: {output_path} ({len(merged_clean)} rows)")
+    return merged_clean
