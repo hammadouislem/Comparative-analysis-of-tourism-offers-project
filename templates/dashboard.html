@@ -132,8 +132,9 @@
             <tr>
               <th>Type</th>
               <th class="num">Avg price (DZD)</th>
-              <th class="num">Avg cost / day (DZD)</th>
               <th class="num">Listings</th>
+              <th class="num">With trip length</th>
+              <th class="num">Avg cost / day (DZD)</th>
             </tr>
           </thead>
           <tbody>
@@ -141,8 +142,40 @@
             <tr>
               <td>{{ row.type }}</td>
               <td class="num">{% if row.average_price is not none %}{{ "{:,.0f}".format(row.average_price).replace(",", " ") }}{% else %}—{% endif %}</td>
-              <td class="num">{% if row.average_cost_per_day is not none %}{{ "{:,.0f}".format(row.average_cost_per_day).replace(",", " ") }}{% else %}—{% endif %}</td>
               <td class="num">{{ row.listing_count }}</td>
+              <td class="num">{{ row.listings_known_duration }}</td>
+              <td class="num">{% if row.average_cost_per_day is not none %}{{ "{:,.0f}".format(row.average_cost_per_day).replace(",", " ") }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if by_source_rows %}
+    <section>
+      <h2>Summary by data source</h2>
+      <p class="sub">Cost/day averages use only rows where trip length was parsed (not assumed).</p>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th class="num">Avg price (DZD)</th>
+              <th class="num">Listings</th>
+              <th class="num">With trip length</th>
+              <th class="num">Avg cost / day (DZD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in by_source_rows %}
+            <tr>
+              <td>{{ row.source }}</td>
+              <td class="num">{% if row.average_price is not none %}{{ "{:,.0f}".format(row.average_price).replace(",", " ") }}{% else %}—{% endif %}</td>
+              <td class="num">{{ row.listing_count }}</td>
+              <td class="num">{{ row.listings_known_duration }}</td>
+              <td class="num">{% if row.average_cost_per_day is not none %}{{ "{:,.0f}".format(row.average_cost_per_day).replace(",", " ") }}{% else %}—{% endif %}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -161,7 +194,7 @@
         </figure>
         <figure class="plot-card">
           <img src="{{ url_for('plot_file', name='clusters.png') }}" alt="Clusters" />
-          <figcaption>K-means clusters (price vs cost per day, scaled in 1000s DZD on the chart axes)</figcaption>
+          <figcaption>K-means clusters (axes in 1000s DZD where applicable; see pipeline logs for duration-based vs log-price mode)</figcaption>
         </figure>
       </div>
     </section>
@@ -180,7 +213,7 @@
           <thead>
             <tr>
               {% for col in results_columns %}
-              <th{% if col in ['price','duration','cost_per_day'] %} class="num"{% endif %}>{{ col.replace('_', ' ') }}</th>
+              <th{% if col in ['price','duration','cost_per_day','cluster'] %} class="num"{% endif %}>{{ col.replace('_', ' ') }}</th>
               {% endfor %}
             </tr>
           </thead>
@@ -188,11 +221,12 @@
             {% for row in results_records %}
             <tr>
               {% for col in results_columns %}
-              <td{% if col in ['price','duration','cost_per_day'] %} class="num"{% endif %}>
+              <td{% if col in ['price','duration','cost_per_day','cluster'] %} class="num"{% endif %}>
                 {% set v = row[col] %}
                 {% if v is none %}—
                 {% elif col in ['price','cost_per_day'] %}{{ "{:,.0f}".format(v).replace(",", " ") }}
                 {% elif col == 'duration' %}{{ "{:.2f}".format(v) }}
+                {% elif col == 'cluster' %}{{ v | int }}
                 {% else %}{{ v }}{% endif %}
               </td>
               {% endfor %}

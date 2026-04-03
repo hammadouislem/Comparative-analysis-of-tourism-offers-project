@@ -38,10 +38,32 @@ def _format_summary(df: pd.DataFrame) -> List[Dict[str, Any]]:
             {
                 "type": str(r.get("type", "")),
                 "average_price": float(r["average_price"]) if pd.notna(r.get("average_price")) else None,
+                "listing_count": int(r["listing_count"]) if pd.notna(r.get("listing_count")) else 0,
+                "listings_known_duration": int(r["listings_known_duration"])
+                if pd.notna(r.get("listings_known_duration"))
+                else 0,
                 "average_cost_per_day": float(r["average_cost_per_day"])
                 if pd.notna(r.get("average_cost_per_day"))
                 else None,
+            }
+        )
+    return rows
+
+
+def _format_by_source(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    rows = []
+    for _, r in df.iterrows():
+        rows.append(
+            {
+                "source": str(r.get("source", "")),
+                "average_price": float(r["average_price"]) if pd.notna(r.get("average_price")) else None,
                 "listing_count": int(r["listing_count"]) if pd.notna(r.get("listing_count")) else 0,
+                "listings_known_duration": int(r["listings_known_duration"])
+                if pd.notna(r.get("listings_known_duration"))
+                else 0,
+                "average_cost_per_day": float(r["average_cost_per_day"])
+                if pd.notna(r.get("average_cost_per_day"))
+                else None,
             }
         )
     return rows
@@ -50,21 +72,42 @@ def _format_summary(df: pd.DataFrame) -> List[Dict[str, Any]]:
 @app.route("/")
 def index():
     summary_path = os.path.join(OUTPUT_DIR, "analysis_summary.csv")
+    by_source_path = os.path.join(OUTPUT_DIR, "analysis_summary_by_source.csv")
     results_path = os.path.join(OUTPUT_DIR, "results.csv")
 
     summary_df = _safe_read_csv(summary_path)
+    by_source_df = _safe_read_csv(by_source_path)
     results_df = _safe_read_csv(results_path)
+
+    if summary_df is not None and not summary_df.empty and "listings_known_duration" not in summary_df.columns:
+        summary_df = summary_df.assign(listings_known_duration=0)
+    if by_source_df is not None and not by_source_df.empty and "listings_known_duration" not in by_source_df.columns:
+        by_source_df = by_source_df.assign(listings_known_duration=0)
 
     summary_rows: List[Dict[str, Any]] = []
     if summary_df is not None and not summary_df.empty:
         summary_rows = _format_summary(summary_df)
+
+    by_source_rows: List[Dict[str, Any]] = []
+    if by_source_df is not None and not by_source_df.empty:
+        by_source_rows = _format_by_source(by_source_df)
 
     results_columns: List[str] = []
     results_records: List[Dict[str, Any]] = []
     results_total = 0
     if results_df is not None and not results_df.empty:
         results_total = len(results_df)
-        want = ["name", "type", "location", "price", "duration", "cost_per_day", "cluster_label"]
+        want = [
+            "source",
+            "name",
+            "type",
+            "location",
+            "price",
+            "duration",
+            "cost_per_day",
+            "cluster",
+            "cluster_label",
+        ]
         cols = [c for c in want if c in results_df.columns]
         sub = results_df[cols].head(40) if cols else results_df.head(40)
         results_columns = list(sub.columns)
@@ -74,7 +117,7 @@ def index():
                 v = row[c]
                 if pd.isna(v):
                     rec[c] = None
-                elif isinstance(v, (float, int)) and c in ("price", "duration", "cost_per_day"):
+                elif isinstance(v, (float, int)) and c in ("price", "duration", "cost_per_day", "cluster"):
                     rec[c] = float(v)
                 else:
                     rec[c] = str(v) if v is not None else None
@@ -85,6 +128,7 @@ def index():
     return render_template(
         "dashboard.html",
         summary_rows=summary_rows,
+        by_source_rows=by_source_rows,
         results_columns=results_columns,
         results_records=results_records,
         results_total=results_total,

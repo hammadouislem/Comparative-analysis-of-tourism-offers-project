@@ -3,6 +3,7 @@ from typing import Dict, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
 import pandas as pd
 
 from utils.helpers import ensure_directory
@@ -10,42 +11,77 @@ from utils.helpers import ensure_directory
 # Plot prices in thousands of DZD so axes show readable numbers (avoid 1e7 notation).
 _PRICE_SCALE = 1000.0
 
-
 def run_analysis(df: pd.DataFrame, output_dir: str) -> Tuple[pd.DataFrame, Dict]:
     ensure_directory(output_dir)
 
     work = df.copy()
     summary_path = os.path.join(output_dir, "analysis_summary.csv")
+    summary_by_source_path = os.path.join(output_dir, "analysis_summary_by_source.csv")
     fig_path = os.path.join(output_dir, "price_distribution.png")
 
     if work.empty:
         print("[Analysis] No rows after merge/clean; skipping aggregates and charts.")
+        empty_cols = [
+            "type",
+            "average_price",
+            "listing_count",
+            "listings_known_duration",
+            "average_cost_per_day",
+        ]
+        pd.DataFrame(columns=empty_cols).to_csv(summary_path, index=False)
         pd.DataFrame(
-            columns=["type", "average_price", "average_cost_per_day", "listing_count"]
-        ).to_csv(summary_path, index=False)
+            columns=["source", "listing_count", "average_price", "listings_known_duration", "average_cost_per_day"]
+        ).to_csv(summary_by_source_path, index=False)
         comparison = {
             "avg_offer_price": None,
             "avg_hotel_price": None,
             "summary_path": summary_path,
+            "summary_by_source_path": summary_by_source_path,
             "price_plot_path": None,
         }
         return work, comparison
 
-    work["duration"] = work["duration"].fillna(1.0)
-    work["duration"] = work["duration"].replace(0, 1.0)
-    work["cost_per_day"] = work["price"] / work["duration"]
+    # cost_per_day only when duration is present and > 0 (no default 1-day assumption).
+    work["cost_per_day"] = np.nan
+    dur_ok = work["duration"].notna() & (work["duration"] > 0)
+    work.loc[dur_ok, "cost_per_day"] = work.loc[dur_ok, "price"] / work.loc[dur_ok, "duration"]
 
     summary = (
         work.groupby("type", as_index=False)
         .agg(
             average_price=("price", "mean"),
-            average_cost_per_day=("cost_per_day", "mean"),
             listing_count=("name", "count"),
+            listings_known_duration=("cost_per_day", lambda s: int(s.notna().sum())),
+            average_cost_per_day=("cost_per_day", "mean"),
         )
         .sort_values(by="average_price")
     )
 
     summary.to_csv(summary_path, index=False)
+
+    if "source" in work.columns:
+        by_src = (
+            work.groupby("source", as_index=False)
+            .agg(
+                average_price=("price", "mean"),
+                listing_count=("name", "count"),
+                listings_known_duration=("cost_per_day", lambda s: int(s.notna().sum())),
+                average_cost_per_day=("cost_per_day", "mean"),
+            )
+            .sort_values(by=["source", "average_price"])
+        )
+        by_src.to_csv(summary_by_source_path, index=False)
+        print(f"[Analysis] Saved per-source summary -> {summary_by_source_path}")
+    else:
+        pd.DataFrame(
+            columns=["source", "listing_count", "average_price", "listings_known_duration", "average_cost_per_day"]
+        ).to_csv(summary_by_source_path, index=False)
+
+    known_n = int(dur_ok.sum())
+    print(
+        f"[Analysis] Listings with known duration: {known_n}/{len(work)} "
+        "(cost_per_day is NaN for the rest - not treated as 1-day trips)."
+    )
 
     price_series = pd.to_numeric(work["price"], errors="coerce").dropna()
     if len(price_series) == 0:
@@ -54,6 +90,7 @@ def run_analysis(df: pd.DataFrame, output_dir: str) -> Tuple[pd.DataFrame, Dict]
             "avg_offer_price": None,
             "avg_hotel_price": None,
             "summary_path": summary_path,
+            "summary_by_source_path": summary_by_source_path,
             "price_plot_path": None,
         }
         print(f"[Analysis] Saved summary -> {summary_path}")
@@ -80,10 +117,11 @@ def run_analysis(df: pd.DataFrame, output_dir: str) -> Tuple[pd.DataFrame, Dict]
         "avg_offer_price": float(offer_avg.iloc[0]) if not offer_avg.empty else None,
         "avg_hotel_price": float(hotel_avg.iloc[0]) if not hotel_avg.empty else None,
         "summary_path": summary_path,
+        "summary_by_source_path": summary_by_source_path,
         "price_plot_path": fig_path,
+        "listings_known_duration": known_n,
     }
 
     print(f"[Analysis] Saved summary -> {summary_path}")
     print(f"[Analysis] Saved price distribution plot -> {fig_path}")
     return work, comparison
-

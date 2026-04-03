@@ -2,6 +2,7 @@ from typing import Optional
 
 import pandas as pd
 
+from processing.filters import is_listing_noise
 from utils.helpers import clean_text, parse_duration_to_days, parse_price
 
 
@@ -30,15 +31,26 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     out["duration"] = out.get("duration", pd.Series([None] * len(out))).map(parse_duration_to_days)
     out["type"] = out.get("type", pd.Series(["offer"] * len(out))).map(_normalize_type)
 
+    if "source" not in out.columns:
+        out["source"] = "unknown"
+
     # Remove clearly unusable rows.
     out = out.dropna(subset=["name"])
     out = out[out["name"] != ""]
     out = out.dropna(subset=["price"])
     out = out[out["price"] > 0]
 
+    # Drop visa/admin-style ads that are not travel products.
+    noise_mask = out["name"].map(is_listing_noise)
+    dropped = int(noise_mask.sum())
+    if dropped:
+        print(f"[Clean] Dropped {dropped} noise rows (visa/admin keywords).")
+    out = out.loc[~noise_mask]
+
     out["location"] = out["location"].replace("", "Unknown")
-    out["duration"] = out["duration"].fillna(1.0)
+
+    # Keep duration as NaN when unknown — do not assume 1 day (avoids fake cost_per_day).
+    out["duration"] = pd.to_numeric(out["duration"], errors="coerce")
 
     out = out.drop_duplicates(subset=["name", "location", "price", "type"]).reset_index(drop=True)
     return out
-

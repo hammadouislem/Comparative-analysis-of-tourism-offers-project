@@ -1,3 +1,3 @@
-type,average_price,average_cost_per_day,listing_count
-offer,94924.71428571429,89694.88878402919,154
-hotel,167681.14814814815,167681.14814814815,81
+type,average_price,listing_count,listings_known_duration,average_cost_per_day
+offer,100146.38461538461,143,26,2931.033566942055
+hotel,163102.31707317074,82,0,

@@ -48,6 +48,7 @@ project/
 ├── processing/
 │   ├── clean_data.py
 │   ├── merge_data.py
+│   ├── filters.py
 │
 ├── analysis/
 │   ├── analysis.py
@@ -95,7 +96,8 @@ Each record is normalized into:
   "type": "offer | hotel",
   "location": "string",
   "price": "float",
-  "duration": "float (days, optional)",
+  "duration": "float (days, optional; NaN if unknown)",
+  "source": "string (provenance id after merge)",
   "rating": "float (optional)"
 }
 ```
@@ -122,40 +124,35 @@ Each record is normalized into:
 
 ### 2) Processing
 
+- `processing/filters.py`
+  - Drops obvious **non-product** rows (visa / consular / paperwork keywords) so averages are less polluted.
+
 - `processing/clean_data.py`
   - Removes duplicates
-  - Handles missing values
-  - Normalizes `price` to float
-  - Normalizes `duration` to days
+  - Normalizes `price` to float; `duration` to days when parseable, otherwise **left as missing** (no default “1 day”)
+  - Applies noise filter from `filters.py`
 
 - `processing/merge_data.py`
-  - Merges **all** non-empty raw CSVs from `data/raw_*.csv` (see `main.py` list)
-  - Standardizes schema
-  - Ensures `type` / `duration` columns
-  - Writes `output/clean_data.csv`
+  - Merges **all** non-empty raw CSVs; each file is tagged with a **`source`** id (see `main.py` `RAW_SOURCES`)
+  - Writes `output/clean_data.csv` (includes `source`)
 
 ### 3) Analysis
 
 - `analysis/analysis.py`
-  - Computes `cost_per_day = price / duration`
-  - Groups by `type`:
-    - average price
-    - average cost per day
-  - Compares `offer` vs `hotel`
+  - **`cost_per_day` only when `duration` is known** (`price / duration`); otherwise NaN (never assumed 1-day)
+  - Summary by **`type`**: average price, listing count, count with known duration, **average cost/day over rows with duration only**
+  - Summary by **`source`**: same metrics per scraper
   - Saves:
     - `output/analysis_summary.csv`
+    - `output/analysis_summary_by_source.csv`
     - `output/price_distribution.png`
 
 ### 4) Clustering
 
 - `analysis/clustering.py`
-  - Uses KMeans (`n_clusters=3`) on:
-    - `price`
-    - `cost_per_day`
-  - Labels clusters as:
-    - budget
-    - mid-range
-    - premium
+  - If **enough listings have known duration** (default ≥ 20): KMeans on **`price` + `cost_per_day`** for those rows; others get cluster label **`no_trip_length`**
+  - Otherwise: KMeans on **`log(1 + price)`** for all rows (price-tier clusters)
+  - Labels: budget / mid-range / premium (by centroid ordering)
   - Saves:
     - `output/results.csv`
     - `output/clusters.png`
@@ -217,6 +214,7 @@ Generated artifacts:
 - `data/raw_petitfute_algerie.csv`
 - `output/clean_data.csv`
 - `output/analysis_summary.csv`
+- `output/analysis_summary_by_source.csv`
 - `output/results.csv`
 - `output/price_distribution.png`
 - `output/clusters.png`

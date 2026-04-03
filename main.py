@@ -2,7 +2,7 @@ import os
 
 from analysis.analysis import run_analysis
 from analysis.clustering import run_clustering
-from processing.merge_data import merge_and_clean
+from processing.merge_data import RawSource, merge_and_clean
 from scraping.onat_scraper import save_onat_csv, scrape_onat
 from scraping.ouedkniss_immobilier_location_vacances_scraper import (
     save_csv as save_ok_immo_csv,
@@ -36,16 +36,16 @@ RAW_PETITFUTE_PATH = os.path.join(DATA_DIR, "raw_petitfute_algerie.csv")
 CLEAN_DATA_PATH = os.path.join(OUTPUT_DIR, "clean_data.csv")
 RESULTS_PATH = os.path.join(OUTPUT_DIR, "results.csv")
 
-# Order: ONAT first (structured reference), then each independent web source.
-ALL_RAW_PATHS = [
-    RAW_ONAT_PATH,
-    RAW_OUEDKNISS_PATH,
-    RAW_OUEDKNISS_VT_PATH,
-    RAW_OUEDKNISS_IMMO_PATH,
-    RAW_SS_TRAVEL_PATH,
-    RAW_TRAVELDZAIR_PATH,
-    RAW_TOURISMALGERIA_PATH,
-    RAW_PETITFUTE_PATH,
+# (csv_path, source_id) — used for merge, cleaning, and per-source analytics.
+RAW_SOURCES: list[RawSource] = [
+    (RAW_ONAT_PATH, "onat"),
+    (RAW_OUEDKNISS_PATH, "ouedkniss"),
+    (RAW_OUEDKNISS_VT_PATH, "ouedkniss_voyages_tourisme"),
+    (RAW_OUEDKNISS_IMMO_PATH, "ouedkniss_location_vacances"),
+    (RAW_SS_TRAVEL_PATH, "ss_travel"),
+    (RAW_TRAVELDZAIR_PATH, "traveldzair"),
+    (RAW_TOURISMALGERIA_PATH, "tourismalgeria"),
+    (RAW_PETITFUTE_PATH, "petitfute"),
 ]
 
 
@@ -84,7 +84,7 @@ def run_pipeline() -> None:
     save_pf_csv(scrape_petitfute_algerie(max_pages=4, delay_seconds=delay), RAW_PETITFUTE_PATH)
 
     print("\n=== Merge + clean (all raw sources) ===")
-    merged_df = merge_and_clean(ALL_RAW_PATHS, CLEAN_DATA_PATH)
+    merged_df = merge_and_clean(RAW_SOURCES, CLEAN_DATA_PATH)
 
     print("\n=== Analysis ===")
     analyzed_df, comparison = run_analysis(merged_df, OUTPUT_DIR)
