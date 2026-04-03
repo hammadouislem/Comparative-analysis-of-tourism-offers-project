@@ -1,11 +1,14 @@
 import os
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 from utils.helpers import ensure_directory
+
+_PRICE_SCALE = 1000.0
 
 
 CLUSTER_LABELS = {0: "budget", 1: "mid-range", 2: "premium"}
@@ -47,10 +50,20 @@ def run_clustering(df: pd.DataFrame, output_csv_path: str, output_dir: str) -> p
     for label in ["budget", "mid-range", "premium"]:
         part = model_df[model_df["cluster_label"] == label]
         if not part.empty:
-            plt.scatter(part["price"], part["cost_per_day"], label=label, alpha=0.7)
-    plt.title("Tourism Listings Clusters")
-    plt.xlabel("Price (DZD)")
-    plt.ylabel("Cost per Day (DZD/day)")
+            plt.scatter(
+                part["price"] / _PRICE_SCALE,
+                part["cost_per_day"] / _PRICE_SCALE,
+                label=label,
+                alpha=0.7,
+            )
+    ax = plt.gca()
+    ax.set_title("Tourism Listings Clusters")
+    ax.set_xlabel("Price (1000 DZD)")
+    ax.set_ylabel("Cost per day (1000 DZD / day)")
+    ax.ticklabel_format(axis="both", style="plain", useOffset=False)
+    space_fmt = mticker.FuncFormatter(lambda x, _p: f"{x:,.0f}".replace(",", " "))
+    ax.xaxis.set_major_formatter(space_fmt)
+    ax.yaxis.set_major_formatter(space_fmt)
     plt.legend()
     plt.tight_layout()
     cluster_plot_path = os.path.join(output_dir, "clusters.png")

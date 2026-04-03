@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tourism Offers — Results</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3d8fd1;
+      --accent-dim: #2a6a9e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 1.65rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .sub { color: var(--muted); font-size: 0.95rem; margin: 0; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin: 0 0 1rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(61, 143, 209, 0.06); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .banner {
+      background: rgba(61, 143, 209, 0.12);
+      border: 1px solid var(--accent-dim);
+      color: var(--text);
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+    .plots {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+    @media (min-width: 900px) {
+      .plots { grid-template-columns: 1fr 1fr; }
+    }
+    .plot-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .plot-card figcaption {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .scroll-x { overflow-x: auto; margin: 0 -0.25rem; }
+    footer {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    code {
+      background: var(--bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Comparative analysis — tourism offers (Algeria)</h1>
+      <p class="sub">Structured platforms vs independent listings · pipeline outputs</p>
+    </header>
+
+    {% if output_missing %}
+    <div class="banner">
+      No summary data yet. Run the pipeline first:
+      <code>python main.py</code>
+      then refresh this page.
+    </div>
+    {% endif %}
+
+    {% if summary_rows %}
+    <section>
+      <h2>Summary by type</h2>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th class="num">Avg price (DZD)</th>
+              <th class="num">Avg cost / day (DZD)</th>
+              <th class="num">Listings</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in summary_rows %}
+            <tr>
+              <td>{{ row.type }}</td>
+              <td class="num">{% if row.average_price is not none %}{{ "{:,.0f}".format(row.average_price).replace(",", " ") }}{% else %}—{% endif %}</td>
+              <td class="num">{% if row.average_cost_per_day is not none %}{{ "{:,.0f}".format(row.average_cost_per_day).replace(",", " ") }}{% else %}—{% endif %}</td>
+              <td class="num">{{ row.listing_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if plots_ok %}
+    <section>
+      <h2>Charts</h2>
+      <div class="plots">
+        <figure class="plot-card">
+          <img src="{{ url_for('plot_file', name='price_distribution.png') }}" alt="Price distribution" />
+          <figcaption>Price distribution</figcaption>
+        </figure>
+        <figure class="plot-card">
+          <img src="{{ url_for('plot_file', name='clusters.png') }}" alt="Clusters" />
+          <figcaption>K-means clusters (price vs cost per day, scaled in 1000s DZD on the chart axes)</figcaption>
+        </figure>
+      </div>
+    </section>
+    {% elif not output_missing %}
+    <section>
+      <h2>Charts</h2>
+      <p class="sub">Plot files not found. Run <code>python main.py</code> to generate PNGs.</p>
+    </section>
+    {% endif %}
+
+    {% if results_records %}
+    <section>
+      <h2>Clustered results (sample of {{ results_total }} rows)</h2>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              {% for col in results_columns %}
+              <th{% if col in ['price','duration','cost_per_day'] %} class="num"{% endif %}>{{ col.replace('_', ' ') }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in results_records %}
+            <tr>
+              {% for col in results_columns %}
+              <td{% if col in ['price','duration','cost_per_day'] %} class="num"{% endif %}>
+                {% set v = row[col] %}
+                {% if v is none %}—
+                {% elif col in ['price','cost_per_day'] %}{{ "{:,.0f}".format(v).replace(",", " ") }}
+                {% elif col == 'duration' %}{{ "{:.2f}".format(v) }}
+                {% else %}{{ v }}{% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <footer>
+      Served locally · <code>python web_app.py</code> · not for public production without hardening
+    </footer>
+  </div>
+</body>
+</html>

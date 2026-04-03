@@ -2,9 +2,13 @@ import os
 from typing import Dict, Tuple
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import pandas as pd
 
 from utils.helpers import ensure_directory
+
+# Plot prices in thousands of DZD so axes show readable numbers (avoid 1e7 notation).
+_PRICE_SCALE = 1000.0
 
 
 def run_analysis(df: pd.DataFrame, output_dir: str) -> Tuple[pd.DataFrame, Dict]:
@@ -56,10 +60,16 @@ def run_analysis(df: pd.DataFrame, output_dir: str) -> Tuple[pd.DataFrame, Dict]
         return work, comparison
 
     plt.figure(figsize=(9, 5))
-    price_series.plot(kind="hist", bins=min(30, max(5, len(price_series))), alpha=0.75)
-    plt.title("Price Distribution of Tourism Listings")
-    plt.xlabel("Price (DZD)")
-    plt.ylabel("Frequency")
+    (price_series / _PRICE_SCALE).plot(
+        kind="hist", bins=min(30, max(5, len(price_series))), alpha=0.75, color="steelblue"
+    )
+    ax = plt.gca()
+    ax.set_title("Price Distribution of Tourism Listings")
+    ax.set_xlabel("Price (1000 DZD)")
+    ax.set_ylabel("Frequency")
+    ax.ticklabel_format(axis="x", style="plain", useOffset=False)
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _p: f"{x:,.0f}".replace(",", " ")))
+    ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=10))
     plt.tight_layout()
     plt.savefig(fig_path, dpi=140)
     plt.close()

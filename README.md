@@ -61,6 +61,9 @@ project/
 │   ├── helpers.py
 │
 ├── main.py
+├── web_app.py
+├── templates/
+│   └── dashboard.html
 ├── requirements.txt
 └── README.md
 ```
@@ -184,6 +187,23 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
+
+### Web dashboard (view results in the browser)
+
+After the pipeline has produced files under `output/`, install Flask if needed and start the local server:
+
+```bash
+pip install flask
+python web_app.py
+```
+
+Open **http://127.0.0.1:5000/** to see:
+
+- Summary table (from `analysis_summary.csv`)
+- Charts (`price_distribution.png`, `clusters.png`)
+- A sample of clustered rows (`results.csv`)
+
+The app is intended for **local use** only; do not expose it to the public internet without proper security hardening.
 
 Generated artifacts:
 
